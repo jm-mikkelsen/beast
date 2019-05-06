@@ -24,7 +24,7 @@ class header;
 template<bool, class, class>
 class message;
 
-template<bool isRequest,class Body, class Fields>
+template<bool isRequest,class Body, class Fields, class Protocol>
 class parser;
 
 namespace detail {
@@ -46,8 +46,8 @@ using is_header = typename is_header_impl<T>::type;
 template<class T>
 struct is_parser : std::false_type {};
 
-template<bool isRequest, class Body, class Fields>
-struct is_parser<parser<isRequest, Body, Fields>> : std::true_type {};
+template<bool isRequest, class Body, class Fields, class Protocol>
+struct is_parser<parser<isRequest, Body, Fields, Protocol>> : std::true_type {};
 
 struct fields_model
 {

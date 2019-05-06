@@ -27,6 +27,7 @@
 #include <boost/beast/http/parser.hpp>
 #include <boost/beast/http/read.hpp>
 #include <boost/beast/http/rfc7230.hpp>
+#include <boost/beast/http/rfc7235.hpp>
 #include <boost/beast/http/serializer.hpp>
 #include <boost/beast/http/span_body.hpp>
 #include <boost/beast/http/status.hpp>

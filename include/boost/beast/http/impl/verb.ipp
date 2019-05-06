@@ -66,6 +66,13 @@ verb_to_string(verb v)
 
     case verb::link:          return "LINK";
     case verb::unlink:        return "UNLINK";
+
+    case verb::register_:     return "REGISTER";
+    case verb::invite:        return "INVITE";
+    case verb::info:          return "INFO";
+    case verb::ack:           return "ACK";
+    case verb::bye:           return "BYE";
+    case verb::cancel:        return "CANCEL";
     
     case verb::unknown:
         return "<unknown>";
@@ -79,14 +86,19 @@ verb
 string_to_verb(string_view v)
 {
 /*
+    ACK
     ACL
     BIND
+    BYE
+    CANCEL
     CHECKOUT
     CONNECT
     COPY
     DELETE
     GET
     HEAD
+    INFO
+    INVITE
     LINK
     LOCK
     M-SEARCH
@@ -104,6 +116,7 @@ string_to_verb(string_view v)
     PURGE
     PUT
     REBIND
+    REGISTER
     REPORT
     SEARCH
     SUBSCRIBE
@@ -135,13 +148,33 @@ string_to_verb(string_view v)
     switch(c)
     {
     case 'A':
-        if(v == "CL")
+        if (v[0] != 'C')
+            break;
+        v.remove_prefix(1);
+        if (eq(v, "K"))
+            return verb::ack;
+        if (eq(v, "L"))
             return verb::acl;
         break;
 
     case 'B':
-        if(v == "IND")
-            return verb::bind;
+        c = v[0];
+        v.remove_prefix(1);
+        switch(c)
+        {
+        case 'I':
+            if(v == "ND")
+                return verb::bind;
+            break;
+
+        case 'Y':
+            if(eq(v, "E"))
+                return verb::bye;
+            break;
+
+        default:
+            break;
+        }
         break;
 
     case 'C':
@@ -149,6 +182,11 @@ string_to_verb(string_view v)
         v.remove_prefix(1);
         switch(c)
         {
+        case 'A':
+            if(eq(v, "NCEL"))
+                return verb::cancel;
+            break;
+
         case 'H':
             if(eq(v, "ECKOUT"))
                 return verb::checkout;
@@ -179,6 +217,28 @@ string_to_verb(string_view v)
     case 'H':
         if(eq(v, "EAD"))
             return verb::head;
+        break;
+
+    case 'I':
+        if(v[0] != 'N')
+            break;
+        c = v[1];
+        v.remove_prefix(2);
+        switch(c)
+        {
+        case 'F':
+            if(eq(v, "O"))
+                return verb::info;
+            break;
+
+        case 'V':
+            if(eq(v, "ITE"))
+                return verb::invite;
+            break;
+
+        default:
+            break;
+        }
         break;
 
     case 'L':
@@ -277,6 +337,8 @@ string_to_verb(string_view v)
         v.remove_prefix(1);
         if(eq(v, "BIND"))
             return verb::rebind;
+        if(eq(v, "GISTER"))
+            return verb::register_;
         if(eq(v, "PORT"))
             return verb::report;
         break;

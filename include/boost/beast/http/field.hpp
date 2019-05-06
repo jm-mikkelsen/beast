@@ -74,6 +74,7 @@ enum class field : unsigned short
     c_pep_info,
     cache_control,
     caldav_timezones,
+    call_id,
     cancel_key,
     cancel_lock,
     cc,
@@ -81,6 +82,7 @@ enum class field : unsigned short
     comments,
     compliance,
     connection,
+    contact,
     content_alternative,
     content_base,
     content_description,
@@ -107,6 +109,7 @@ enum class field : unsigned short
     cookie,
     cookie2,
     cost,
+    cseq,
     dasl,
     date,
     date_received,
@@ -323,6 +326,7 @@ enum class field : unsigned short
     subst,
     summary,
     supersedes,
+    supported,
     surrogate_capability,
     surrogate_control,
     tcn,
@@ -391,7 +395,7 @@ to_string(field f);
     if no known field matches.
 */
 field
-string_to_field(string_view s);
+default_string_to_field(string_view s);
 
 /// Write the text for a field name to an output stream.
 inline

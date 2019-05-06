@@ -25,11 +25,11 @@ namespace boost {
 namespace beast {
 namespace http {
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 template<class OtherDerived>
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 basic_parser(basic_parser<
-        isRequest, OtherDerived>&& other)
+        isRequest, OtherDerived, Protocol>&& other)
     : body_limit_(other.body_limit_)
     , len_(other.len_)
     , buf_(std::move(other.buf_))
@@ -42,9 +42,9 @@ basic_parser(basic_parser<
 {
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 bool
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 keep_alive() const
 {
     BOOST_ASSERT(is_header_done());
@@ -61,20 +61,24 @@ keep_alive() const
     return (f_ & flagNeedEOF) == 0;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 boost::optional<std::uint64_t>
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 content_length() const
 {
     BOOST_ASSERT(is_header_done());
     if(! (f_ & flagContentLength))
+    {
+        if (Protocol::override_content_length())
+            return 0;
         return boost::none;
+    }
     return len_;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 skip(bool v)
 {
     BOOST_ASSERT(! got_some());
@@ -84,10 +88,10 @@ skip(bool v)
         f_ &= ~flagSkipBody;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 template<class ConstBufferSequence>
 std::size_t
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 put(ConstBufferSequence const& buffers,
     error_code& ec)
 {
@@ -124,9 +128,9 @@ put(ConstBufferSequence const& buffers,
         buf_.get(), buf_len_}, ec);
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 std::size_t
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 put(net::const_buffer const& buffer,
     error_code& ec)
 {
@@ -267,9 +271,9 @@ done:
     return static_cast<std::size_t>(p - p0);
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 put_eof(error_code& ec)
 {
     BOOST_ASSERT(got_some());
@@ -295,10 +299,10 @@ put_eof(error_code& ec)
     state_ = state::complete;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 template<class ConstBufferSequence>
 std::size_t
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 put_from_stack(std::size_t size,
     ConstBufferSequence const& buffers,
         error_code& ec)
@@ -311,10 +315,10 @@ put_from_stack(std::size_t size,
         buf, size}, ec);
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 maybe_need_more(
     char const* p, std::size_t n,
         error_code& ec)
@@ -344,10 +348,10 @@ maybe_need_more(
     skip_ = 0;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_start_line(
     char const*& in, char const* last,
     error_code& ec, std::true_type)
@@ -369,10 +373,10 @@ parse_start_line(
         return;
 
     int version = 0;
-    parse_version(p, last, version, ec);
+    parse_version(p, last, version, Protocol::name(), ec);
     if(ec)
         return;
-    if(version < 10 || version > 11)
+    if(! Protocol::check_version(version))
     {
         ec = error::bad_version;
         return;
@@ -390,7 +394,7 @@ parse_start_line(
     }
     p += 2;
 
-    if(version >= 11)
+    if(Protocol::use_http11_keepalive(version))
         f_ |= flagHTTP11;
 
     impl().on_request_impl(string_to_verb(method),
@@ -402,10 +406,10 @@ parse_start_line(
     state_ = state::fields;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_start_line(
     char const*& in, char const* last,
     error_code& ec, std::false_type)
@@ -418,10 +422,10 @@ parse_start_line(
     auto p = in;
 
     int version = 0;
-    parse_version(p, last, version, ec);
+    parse_version(p, last, version, Protocol::name(), ec);
     if(ec)
         return;
-    if(version < 10 || version > 11)
+    if(! Protocol::check_version(version))
     {
         ec = error::bad_version;
         return;
@@ -449,7 +453,7 @@ parse_start_line(
     if(ec)
         return;
 
-    if(version >= 11)
+    if(Protocol::use_http11_keepalive(version))
         f_ |= flagHTTP11;
 
     impl().on_response_impl(
@@ -461,9 +465,9 @@ parse_start_line(
     state_ = state::fields;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_fields(char const*& in,
     char const* last, error_code& ec)
 {
@@ -489,10 +493,13 @@ parse_fields(char const*& in,
         parse_field(p, last, name, value, buf, ec);
         if(ec)
             return;
-        auto const f = string_to_field(name);
+        auto const f = Protocol::string_to_field(name);
         do_field(f, value, ec);
         if(ec)
             return;
+        // Normalise field name to the uncompact version for on_field_impl().
+        if (f != field::unknown)
+            name = to_string(f);
         impl().on_field_impl(f, name, value, ec);
         if(ec)
             return;
@@ -500,10 +507,10 @@ parse_fields(char const*& in,
     }
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 finish_header(error_code& ec, std::true_type)
 {
     // RFC 7230 section 3.3
@@ -552,10 +559,10 @@ finish_header(error_code& ec, std::true_type)
     }
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 finish_header(error_code& ec, std::false_type)
 {
     // RFC 7230 section 3.3
@@ -588,10 +595,20 @@ finish_header(error_code& ec, std::false_type)
             state_ = state::complete;
         }
     }
+    else if(Protocol::content_length_required())
+    {
+        ec = error::bad_content_length;
+        return;
+    }
     else if(f_ & flagChunked)
     {
         f_ |= flagHasBody;
         state_ = state::chunk_header0;
+    }
+    else if (Protocol::override_content_length())
+    {
+        len_ = 0;
+        state_ = state::complete;
     }
     else
     {
@@ -611,10 +628,10 @@ finish_header(error_code& ec, std::false_type)
     }
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_body(char const*& p,
     std::size_t n, error_code& ec)
 {
@@ -632,10 +649,10 @@ parse_body(char const*& p,
     state_ = state::complete;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_body_to_eof(char const*& p,
     std::size_t n, error_code& ec)
 {
@@ -651,9 +668,9 @@ parse_body_to_eof(char const*& p,
         return;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_chunk_header(char const*& p0,
     std::size_t n, error_code& ec)
 {
@@ -788,10 +805,10 @@ parse_chunk_header(char const*& p0,
     state_ = state::complete;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 inline
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 parse_chunk_body(char const*& p,
     std::size_t n, error_code& ec)
 {
@@ -804,9 +821,9 @@ parse_chunk_body(char const*& p,
         state_ = state::chunk_header;
 }
 
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol>
 void
-basic_parser<isRequest, Derived>::
+basic_parser<isRequest, Derived, Protocol>::
 do_field(field f,
     string_view value, error_code& ec)
 {
@@ -904,6 +921,14 @@ do_field(field f,
             return;
         if(std::next(p) != v.end())
             return;
+
+        if (! Protocol::accept_chunked())
+        {
+            // prohibited
+            ec = error::bad_transfer_encoding;
+            return;
+        }
+
         len_ = 0;
         f_ |= flagChunked;
         return;

@@ -15,6 +15,7 @@
 #include <boost/beast/core/string.hpp>
 #include <boost/beast/http/field.hpp>
 #include <boost/beast/http/verb.hpp>
+#include <boost/beast/http/protocol.hpp>
 #include <boost/beast/http/detail/basic_parser.hpp>
 #include <boost/asio/buffer.hpp>
 #include <boost/optional.hpp>
@@ -66,12 +67,12 @@ namespace http {
     @code
         template<bool isRequest>
         class derived
-            : public basic_parser<isRequest, derived<isRequest>>
+            : public basic_parser<isRequest, derived<isRequest>, protocol>
         {
         private:
             // The friend declaration is needed,
             // otherwise the callbacks must be made public.
-            friend class basic_parser<isRequest, derived>;
+            friend class basic_parser<isRequest, derived, protocol>;
 
             /// Called after receiving the request-line (isRequest == true).
             void
@@ -168,11 +169,11 @@ namespace http {
     @note If the parser encounters a field value with obs-fold
     longer than 4 kilobytes in length, an error is generated.
 */
-template<bool isRequest, class Derived>
+template<bool isRequest, class Derived, class Protocol = protocol>
 class basic_parser
     : private detail::basic_parser_base
 {
-    template<bool OtherIsRequest, class OtherDerived>
+    template<bool OtherIsRequest, class OtherDerived, class OtherProtocol>
     friend class basic_parser;
 
     // limit on the size of the stack flat buffer
@@ -203,24 +204,8 @@ class basic_parser
     static unsigned constexpr flagUpgrade               = 1<< 12;
     static unsigned constexpr flagFinalChunk            = 1<< 13;
 
-    static constexpr
-    std::uint64_t
-    default_body_limit(std::true_type)
-    {
-        // limit for requests
-        return 1 * 1024 * 1024; // 1MB
-    }
-
-    static constexpr
-    std::uint64_t
-    default_body_limit(std::false_type)
-    {
-        // limit for responses
-        return 8 * 1024 * 1024; // 8MB
-    }
-
     std::uint64_t body_limit_ =
-        default_body_limit(is_request{});   // max payload body
+        Protocol::default_body_limit(is_request{});   // max payload body
     std::uint64_t len_ = 0;                 // size of chunk or body
     std::unique_ptr<char[]> buf_;           // temp storage
     std::size_t buf_len_ = 0;               // size of buf_
@@ -248,7 +233,7 @@ protected:
         moved-from object is destruction.
     */
     template<class OtherDerived>
-    basic_parser(basic_parser<isRequest, OtherDerived>&&);
+    basic_parser(basic_parser<isRequest, OtherDerived, Protocol>&&);
 
 public:
     /// `true` if this parser parses requests, `false` for responses.

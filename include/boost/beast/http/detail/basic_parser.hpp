@@ -440,32 +440,20 @@ struct basic_parser_base
     void
     parse_version(
         char const*& it, char const* last,
-        int& result, error_code& ec)
+        int& result, string_view name, error_code& ec)
     {
-        if(it + 8 > last)
+        if(it + 4 + name.size() > last)
         {
             ec = error::need_more;
             return;
         }
-        if(*it++ != 'H')
+        for (auto c : name)
         {
-            ec = error::bad_version;
-            return;
-        }
-        if(*it++ != 'T')
-        {
-            ec = error::bad_version;
-            return;
-        }
-        if(*it++ != 'T')
-        {
-            ec = error::bad_version;
-            return;
-        }
-        if(*it++ != 'P')
-        {
-            ec = error::bad_version;
-            return;
+            if(*it++ != c)
+            {
+                ec = error::bad_version;
+                return;
+            }
         }
         if(*it++ != '/')
         {

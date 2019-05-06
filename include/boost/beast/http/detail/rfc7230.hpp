@@ -314,6 +314,24 @@ trim(string_view s)
         static_cast<std::size_t>(last - first)};
 }
 
+inline
+std::string
+unquote(string_view sr)
+{
+    std::string s;
+    s.reserve(sr.size());
+    auto it = sr.begin() + 1;
+    auto end = sr.end() - 1;
+    while(it != end)
+    {
+        if(*it == '\\')
+            ++it;
+        s.push_back(*it);
+        ++it;
+    }
+    return s;
+}
+
 struct param_iter
 {
     using iter_type = string_view::const_iterator;

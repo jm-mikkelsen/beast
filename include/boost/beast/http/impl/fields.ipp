@@ -34,8 +34,8 @@ namespace boost {
 namespace beast {
 namespace http {
 
-template<class Allocator>
-class basic_fields<Allocator>::writer
+template<class Allocator, class Protocol>
+class basic_fields<Allocator, Protocol>::writer
 {
 public:
     using iter_type = typename list_t::const_iterator;
@@ -152,7 +152,7 @@ public:
 
     basic_fields const& f_;
     boost::optional<view_type> view_;
-    char buf_[13];
+    char buf_[16];
 
 public:
     using const_buffers_type =
@@ -173,8 +173,8 @@ public:
     }
 };
 
-template<class Allocator>
-basic_fields<Allocator>::writer::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::writer::
 writer(basic_fields const& f)
     : f_(f)
 {
@@ -186,8 +186,8 @@ writer(basic_fields const& f)
         chunk_crlf());
 }
 
-template<class Allocator>
-basic_fields<Allocator>::writer::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::writer::
 writer(basic_fields const& f,
         unsigned version, verb v)
     : f_(f)
@@ -196,7 +196,7 @@ writer(basic_fields const& f,
     request
         "<method>"
         " <target>"
-        " HTTP/X.Y\r\n" (11 chars)
+        " HTTP/X.Y\r\n" (7 + length_of_protocol_string chars)
 */
     string_view sv;
     if(v == verb::unknown)
@@ -206,53 +206,60 @@ writer(basic_fields const& f,
 
     // target_or_reason_ has a leading SP
 
+    BOOST_ASSERT(Protocol::name().size() + 7 <= sizeof(buf_));
+
     buf_[0] = ' ';
-    buf_[1] = 'H';
-    buf_[2] = 'T';
-    buf_[3] = 'T';
-    buf_[4] = 'P';
-    buf_[5] = '/';
-    buf_[6] = '0' + static_cast<char>(version / 10);
-    buf_[7] = '.';
-    buf_[8] = '0' + static_cast<char>(version % 10);
-    buf_[9] = '\r';
-    buf_[10]= '\n';
+
+    size_t i = 1;
+
+    for (auto c : Protocol::name())
+        buf_[i++] = c;
+
+    buf_[i++] = '/';
+    buf_[i++] = '0' + static_cast<char>(version / 10);
+    buf_[i++] = '.';
+    buf_[i++] = '0' + static_cast<char>(version % 10);
+    buf_[i++] = '\r';
+    buf_[i++]= '\n';
 
     view_.emplace(
         net::const_buffer{sv.data(), sv.size()},
         net::const_buffer{
             f_.target_or_reason_.data(),
             f_.target_or_reason_.size()},
-        net::const_buffer{buf_, 11},
+        net::const_buffer{buf_, i},
         field_range(f_.list_.begin(), f_.list_.end()),
         chunk_crlf());
 }
 
-template<class Allocator>
-basic_fields<Allocator>::writer::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::writer::
 writer(basic_fields const& f,
         unsigned version, unsigned code)
     : f_(f)
 {
 /*
     response
-        "HTTP/X.Y ### " (13 chars)
+        "HTTP/X.Y ### " (9 + length_of_protocol chars)
         "<reason>"
         "\r\n"
 */
-    buf_[0] = 'H';
-    buf_[1] = 'T';
-    buf_[2] = 'T';
-    buf_[3] = 'P';
-    buf_[4] = '/';
-    buf_[5] = '0' + static_cast<char>(version / 10);
-    buf_[6] = '.';
-    buf_[7] = '0' + static_cast<char>(version % 10);
-    buf_[8] = ' ';
-    buf_[9] = '0' + static_cast<char>(code / 100);
-    buf_[10]= '0' + static_cast<char>((code / 10) % 10);
-    buf_[11]= '0' + static_cast<char>(code % 10);
-    buf_[12]= ' ';
+    BOOST_ASSERT(Protocol::name().size() + 9 <= sizeof(buf_));
+
+    size_t i = 0;
+
+    for (auto c : Protocol::name())
+        buf_[i++] = c;
+
+    buf_[i++] = '/';
+    buf_[i++] = '0' + static_cast<char>(version / 10);
+    buf_[i++] = '.';
+    buf_[i++] = '0' + static_cast<char>(version % 10);
+    buf_[i++] = ' ';
+    buf_[i++] = '0' + static_cast<char>(code / 100);
+    buf_[i++]= '0' + static_cast<char>((code / 10) % 10);
+    buf_[i++]= '0' + static_cast<char>(code % 10);
+    buf_[i++]= ' ';
 
     string_view sv;
     if(! f_.target_or_reason_.empty())
@@ -261,7 +268,7 @@ writer(basic_fields const& f,
         sv = obsolete_reason(static_cast<status>(code));
 
     view_.emplace(
-        net::const_buffer{buf_, 13},
+        net::const_buffer{buf_, i},
         net::const_buffer{sv.data(), sv.size()},
         net::const_buffer{"\r\n", 2},
         field_range(f_.list_.begin(), f_.list_.end()),
@@ -270,9 +277,9 @@ writer(basic_fields const& f,
 
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 char*
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 value_type::
 data() const
 {
@@ -281,9 +288,9 @@ data() const
             static_cast<element const*>(this) + 1));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 net::const_buffer
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 value_type::
 buffer() const
 {
@@ -291,8 +298,8 @@ buffer() const
         static_cast<std::size_t>(off_) + len_ + 2};
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 value_type::
 value_type(field name,
     string_view sname, string_view value)
@@ -301,7 +308,7 @@ value_type(field name,
     , f_(name)
 {
     //BOOST_ASSERT(name == field::unknown ||
-    //    iequals(sname, to_string(name)));
+    //    iequals(sname, Protocol::name_to_string(name)));
     char* p = data();
     p[off_-2] = ':';
     p[off_-1] = ' ';
@@ -311,18 +318,18 @@ value_type(field name,
     value.copy(p + off_, value.size());
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 field
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 value_type::
 name() const
 {
     return f_;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 value_type::
 name_string() const
 {
@@ -330,9 +337,9 @@ name_string() const
         static_cast<std::size_t>(off_ - 2)};
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 value_type::
 value() const
 {
@@ -340,8 +347,8 @@ value() const
         static_cast<std::size_t>(len_)};
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 element::
 element(field name,
     string_view sname, string_view value)
@@ -351,8 +358,8 @@ element(field name,
 
 //------------------------------------------------------------------------------
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 ~basic_fields()
 {
     delete_list();
@@ -361,15 +368,15 @@ basic_fields<Allocator>::
         target_or_reason_, {});
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 basic_fields(Allocator const& alloc) noexcept
     : boost::empty_value<Allocator>(boost::empty_init_t(), alloc)
 {
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields&& other) noexcept
     : boost::empty_value<Allocator>(boost::empty_init_t(),
         std::move(other.get()))
@@ -380,8 +387,8 @@ basic_fields(basic_fields&& other) noexcept
 {
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields&& other, Allocator const& alloc)
     : boost::empty_value<Allocator>(boost::empty_init_t(), alloc)
 {
@@ -399,8 +406,8 @@ basic_fields(basic_fields&& other, Allocator const& alloc)
     }
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields const& other)
     : boost::empty_value<Allocator>(boost::empty_init_t(), alloc_traits::
         select_on_container_copy_construction(other.get()))
@@ -408,8 +415,8 @@ basic_fields(basic_fields const& other)
     copy_all(other);
 }
 
-template<class Allocator>
-basic_fields<Allocator>::
+template<class Allocator, class Protocol>
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields const& other,
         Allocator const& alloc)
     : boost::empty_value<Allocator>(boost::empty_init_t(), alloc)
@@ -417,17 +424,17 @@ basic_fields(basic_fields const& other,
     copy_all(other);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 template<class OtherAlloc>
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields<OtherAlloc> const& other)
 {
     copy_all(other);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 template<class OtherAlloc>
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 basic_fields(basic_fields<OtherAlloc> const& other,
         Allocator const& alloc)
     : boost::empty_value<Allocator>(boost::empty_init_t(), alloc)
@@ -435,9 +442,9 @@ basic_fields(basic_fields<OtherAlloc> const& other,
     copy_all(other);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 operator=(basic_fields&& other) noexcept(
     alloc_traits::propagate_on_container_move_assignment::value)
       -> basic_fields&
@@ -451,9 +458,9 @@ operator=(basic_fields&& other) noexcept(
     return *this;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 operator=(basic_fields const& other) ->
     basic_fields&
 {
@@ -462,10 +469,10 @@ operator=(basic_fields const& other) ->
     return *this;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 template<class OtherAlloc>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 operator=(basic_fields<OtherAlloc> const& other) ->
     basic_fields&
 {
@@ -480,9 +487,9 @@ operator=(basic_fields<OtherAlloc> const& other) ->
 //
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 at(field name) const
 {
     BOOST_ASSERT(name != field::unknown);
@@ -493,9 +500,9 @@ at(field name) const
     return it->value();
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 at(string_view name) const
 {
     auto const it = find(name);
@@ -505,9 +512,9 @@ at(string_view name) const
     return it->value();
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 operator[](field name) const
 {
     BOOST_ASSERT(name != field::unknown);
@@ -517,9 +524,9 @@ operator[](field name) const
     return it->value();
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 string_view const
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 operator[](string_view name) const
 {
     auto const it = find(name);
@@ -534,9 +541,9 @@ operator[](string_view name) const
 //
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 clear()
 {
     delete_list();
@@ -544,32 +551,34 @@ clear()
     list_.clear();
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 insert(field name, string_param const& value)
 {
     BOOST_ASSERT(name != field::unknown);
     insert(name, to_string(name), value);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 insert(string_view sname, string_param const& value)
 {
     auto const name =
-        string_to_field(sname);
+        Protocol::string_to_field(sname);
     insert(name, sname, value);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 insert(field name,
     string_view sname, string_param const& value)
 {
+    if (name != field::unknown)
+        sname = Protocol::field_to_compact(name);
     auto& e = new_element(name, sname,
         static_cast<string_view>(value));
     auto const before =
@@ -595,29 +604,29 @@ insert(field name,
     list_.insert(++list_.iterator_to(*last), e);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set(field name, string_param const& value)
 {
     BOOST_ASSERT(name != field::unknown);
-    set_element(new_element(name, to_string(name),
+    set_element(new_element(name, Protocol::field_to_compact(name),
         static_cast<string_view>(value)));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set(string_view sname, string_param const& value)
 {
     set_element(new_element(
-        string_to_field(sname), sname,
+        Protocol::string_to_field(sname), sname,
             static_cast<string_view>(value)));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 erase(const_iterator pos) ->
     const_iterator
 {
@@ -629,22 +638,23 @@ erase(const_iterator pos) ->
     return next;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 std::size_t
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 erase(field name)
 {
     BOOST_ASSERT(name != field::unknown);
-    return erase(to_string(name));
+    return erase(Protocol::field_to_compact(name));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 std::size_t
-basic_fields<Allocator>::
-erase(string_view name)
+basic_fields<Allocator, Protocol>::
+erase(string_view sname)
 {
     std::size_t n =0;
-    set_.erase_and_dispose(name, key_compare{},
+
+    set_.erase_and_dispose(Protocol::name_to_compact(sname), key_compare{},
         [&](element* e)
         {
             ++n;
@@ -654,20 +664,20 @@ erase(string_view name)
     return n;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
-swap(basic_fields<Allocator>& other)
+basic_fields<Allocator, Protocol>::
+swap(basic_fields<Allocator, Protocol>& other)
 {
     swap(other, std::integral_constant<bool,
         alloc_traits::propagate_on_container_swap::value>{});
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
 swap(
-    basic_fields<Allocator>& lhs,
-    basic_fields<Allocator>& rhs)
+    basic_fields<Allocator, Protocol>& lhs,
+    basic_fields<Allocator, Protocol>& rhs)
 {
     lhs.swap(rhs);
 }
@@ -678,67 +688,67 @@ swap(
 //
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 std::size_t
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 count(field name) const
 {
     BOOST_ASSERT(name != field::unknown);
-    return count(to_string(name));
+    return count(Protocol::field_to_compact(name));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 std::size_t
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 count(string_view name) const
 {
-    return set_.count(name, key_compare{});
+    return set_.count(Protocol::name_to_compact(name), key_compare{});
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 find(field name) const ->
     const_iterator
 {
     BOOST_ASSERT(name != field::unknown);
-    return find(to_string(name));
+    return find(Protocol::field_to_compact(name));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 find(string_view name) const ->
     const_iterator
 {
     auto const it = set_.find(
-        name, key_compare{});
+        Protocol::name_to_compact(name), key_compare{});
     if(it == set_.end())
         return list_.end();
     return list_.iterator_to(*it);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 equal_range(field name) const ->
     std::pair<const_iterator, const_iterator>
 {
     BOOST_ASSERT(name != field::unknown);
-    return equal_range(to_string(name));
+    return equal_range(Protocol::field_to_compact(name));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 equal_range(string_view name) const ->
     std::pair<const_iterator, const_iterator>
 {
     auto result =
-        set_.equal_range(name, key_compare{});
+        set_.equal_range(Protocol::name_to_compact(name), key_compare{});
     if(result.first == result.second)
         return {list_.end(), list_.end()};
     return {
@@ -821,9 +831,9 @@ template<class String>
 void
 keep_alive_impl(
     String& s, string_view value,
-    unsigned version, bool keep_alive)
+    bool http11_style, bool keep_alive)
 {
-    if(version < 11)
+    if(! http11_style)
     {
         if(keep_alive)
         {
@@ -887,19 +897,19 @@ keep_alive_impl(
 
 // Fields
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 string_view
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 get_method_impl() const
 {
     return method_;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 string_view
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 get_target_impl() const
 {
     if(target_or_reason_.empty())
@@ -909,18 +919,18 @@ get_target_impl() const
         target_or_reason_.size() - 1};
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 string_view
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 get_reason_impl() const
 {
     return target_or_reason_;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 bool
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 get_chunked_impl() const
 {
     auto const te = token_list{
@@ -935,9 +945,9 @@ get_chunked_impl() const
     return false;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 bool
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 get_keep_alive_impl(unsigned version) const
 {
     auto const it = find(field::connection);
@@ -954,46 +964,46 @@ get_keep_alive_impl(unsigned version) const
         it->value()}.exists("close");
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 bool
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 has_content_length_impl() const
 {
     return count(field::content_length) > 0;
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_method_impl(string_view s)
 {
     realloc_string(method_, s);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_target_impl(string_view s)
 {
     realloc_target(
         target_or_reason_, s);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_reason_impl(string_view s)
 {
     realloc_string(
         target_or_reason_, s);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_chunked_impl(bool value)
 {
     auto it = find(field::transfer_encoding);
@@ -1088,9 +1098,9 @@ set_chunked_impl(bool value)
     }
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_content_length_impl(
     boost::optional<std::uint64_t> const& value)
 {
@@ -1100,9 +1110,9 @@ set_content_length_impl(
         set(field::content_length, *value);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_keep_alive_impl(
     unsigned version, bool keep_alive)
 {
@@ -1112,7 +1122,7 @@ set_keep_alive_impl(
     {
         static_string<max_static_buffer> buf;
         detail::keep_alive_impl(
-            buf, value, version, keep_alive);
+            buf, value, Protocol::use_http11_keepalive(version), keep_alive);
         if(buf.empty())
             erase(field::connection);
         else
@@ -1134,7 +1144,7 @@ set_keep_alive_impl(
     #endif
         s.reserve(value.size());
         detail::keep_alive_impl(
-            s, value, version, keep_alive);
+            s, value, Protocol::use_http11_keepalive(version), keep_alive);
         if(s.empty())
             erase(field::connection);
         else
@@ -1144,13 +1154,15 @@ set_keep_alive_impl(
 
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 auto
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 new_element(field name,
     string_view sname, string_view value) ->
         element&
 {
+    if (name != field::unknown)
+        sname = Protocol::field_to_compact(name);
     if(sname.size() + 2 >
             (std::numeric_limits<off_t>::max)())
         BOOST_THROW_EXCEPTION(std::length_error{
@@ -1171,9 +1183,9 @@ new_element(field name,
     return *(::new(p) element(name, sname, value));
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 delete_element(element& e)
 {
     auto a = rebind_type{this->get()};
@@ -1185,9 +1197,9 @@ delete_element(element& e)
         //reinterpret_cast<align_type*>(&e), n);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 set_element(element& e)
 {
     auto it = set_.lower_bound(
@@ -1215,9 +1227,9 @@ set_element(element& e)
     list_.push_back(e);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 realloc_string(string_view& dest, string_view s)
 {
     if(dest.empty() && s.empty())
@@ -1240,9 +1252,9 @@ realloc_string(string_view& dest, string_view s)
         dest = {};
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 realloc_target(
     string_view& dest, string_view s)
 {
@@ -1270,11 +1282,11 @@ realloc_target(
         dest = {};
 }
 
-template<class Allocator>
-template<class OtherAlloc>
+template<class Allocator, class Protocol>
+template<class OtherAlloc, class OtherProtocol>
 void
-basic_fields<Allocator>::
-copy_all(basic_fields<OtherAlloc> const& other)
+basic_fields<Allocator, Protocol>::
+copy_all(basic_fields<OtherAlloc, OtherProtocol> const& other)
 {
     for(auto const& e : other.list_)
         insert(e.name(), e.name_string(), e.value());
@@ -1283,9 +1295,9 @@ copy_all(basic_fields<OtherAlloc> const& other)
         other.target_or_reason_);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 clear_all()
 {
     clear();
@@ -1293,9 +1305,9 @@ clear_all()
     realloc_string(target_or_reason_, {});
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 delete_list()
 {
     for(auto it = list_.begin(); it != list_.end();)
@@ -1304,10 +1316,10 @@ delete_list()
 
 //------------------------------------------------------------------------------
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 move_assign(basic_fields& other, std::true_type)
 {
     clear_all();
@@ -1320,10 +1332,10 @@ move_assign(basic_fields& other, std::true_type)
     this->get() = other.get();
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 move_assign(basic_fields& other, std::false_type)
 {
     clear_all();
@@ -1343,10 +1355,10 @@ move_assign(basic_fields& other, std::false_type)
     }
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 copy_assign(basic_fields const& other, std::true_type)
 {
     clear_all();
@@ -1354,20 +1366,20 @@ copy_assign(basic_fields const& other, std::true_type)
     copy_all(other);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 copy_assign(basic_fields const& other, std::false_type)
 {
     clear_all();
     copy_all(other);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 swap(basic_fields& other, std::true_type)
 {
     using std::swap;
@@ -1378,10 +1390,10 @@ swap(basic_fields& other, std::true_type)
     swap(target_or_reason_, other.target_or_reason_);
 }
 
-template<class Allocator>
+template<class Allocator, class Protocol>
 inline
 void
-basic_fields<Allocator>::
+basic_fields<Allocator, Protocol>::
 swap(basic_fields& other, std::false_type)
 {
     BOOST_ASSERT(this->get() == other.get());

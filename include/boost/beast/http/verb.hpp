@@ -125,7 +125,16 @@ enum class verb
     // RFC-2068, section 19.6.1.2
 
     link,
-    unlink
+    unlink,
+
+    // SIP, RFC-3261
+
+    register_,
+    invite,
+    info,
+    ack,
+    bye,
+    cancel
 };
 
 /** Converts a string to the request method verb.

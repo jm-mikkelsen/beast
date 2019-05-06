@@ -30,8 +30,13 @@ enum class status : unsigned
     unknown = 0,
 
     continue_                           = 100,
+    trying                              = 100,  // Duplicate from RFC 3261
     switching_protocols                 = 101,
     processing                          = 102,
+    ringing                             = 180,  // RFC 3261
+    call_is_being_forwarded             = 181,  // RFC 3261
+    queued                              = 182,  // RFC 3261
+    session_progress                    = 183,  // RFC 3261
 
     ok                                  = 200,
     created                             = 201,
@@ -52,6 +57,7 @@ enum class status : unsigned
     use_proxy                           = 305,
     temporary_redirect                  = 307,
     permanent_redirect                  = 308,
+    alternative_service                 = 380,  // RFC 3261
 
     bad_request                         = 400,
     unauthorized                        = 401,
@@ -70,10 +76,14 @@ enum class status : unsigned
     uri_too_long                        = 414,
     unsupported_media_type              = 415,
     range_not_satisfiable               = 416,
+    unsupported_uri_scheme              = 416,  // Duplicate from RFC 3261
     expectation_failed                  = 417,
+    bad_extension                       = 420,  // RFC 3261
     misdirected_request                 = 421,
+    extension_required                  = 421,  // Duplicate from RFC 3261
     unprocessable_entity                = 422,
     locked                              = 423,
+    interval_too_brief                  = 423,  // Duplicate from RFC 3261
     failed_dependency                   = 424,
     upgrade_required                    = 426,
     precondition_required               = 428,
@@ -81,6 +91,17 @@ enum class status : unsigned
     request_header_fields_too_large     = 431,
     connection_closed_without_response  = 444,
     unavailable_for_legal_reasons       = 451,
+    temporarily_unavailable             = 480,  // RFC 3261
+    call_or_transaction_does_not_exist  = 481,  // RFC 3261
+    sip_loop_detected                   = 482,  // RFC 3261
+    too_many_hops                       = 483,  // RFC 3261
+    address_incomplete                  = 484,  // RFC 3261
+    ambiguous                           = 485,  // RFC 3261
+    busy_here                           = 486,  // RFC 3261
+    request_terminated                  = 487,  // RFC 3261
+    not_acceptable_here                 = 488,  // RFC 3261
+    request_pending                     = 491,  // RFC 3261
+    undecipherable                      = 493,  // RFC 3261
     client_closed_request               = 499,
 
     internal_server_error               = 500,
@@ -94,6 +115,7 @@ enum class status : unsigned
     loop_detected                       = 508,
     not_extended                        = 510,
     network_authentication_required     = 511,
+    message_too_large                   = 513,
     network_connect_timeout_error       = 599
 };
 

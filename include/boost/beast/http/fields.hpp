@@ -15,6 +15,7 @@
 #include <boost/beast/core/string.hpp>
 #include <boost/beast/core/detail/allocator.hpp>
 #include <boost/beast/http/field.hpp>
+#include "boost/beast/http/protocol.hpp"
 #include <boost/asio/buffer.hpp>
 #include <boost/core/empty_value.hpp>
 #include <boost/intrusive/list.hpp>
@@ -50,7 +51,7 @@ namespace http {
     @tparam Allocator The allocator to use. This must meet the
     requirements of @b Allocator.
 */
-template<class Allocator>
+template<class Allocator, class Protocol = protocol>
 class basic_fields
 #if ! BOOST_BEAST_DOXYGEN
     : private boost::empty_value<Allocator>
@@ -72,6 +73,8 @@ class basic_fields
 public:
     /// The type of allocator used.
     using allocator_type = Allocator;
+
+    using protocol = Protocol;
 
     /// The type of element used to represent a field 
     class value_type
@@ -707,7 +710,7 @@ protected:
         unsigned version, bool keep_alive);
 
 private:
-    template<class OtherAlloc>
+    template<class OtherAlloc, class OtherProtocol>
     friend class basic_fields;
 
     element&
@@ -727,9 +730,9 @@ private:
     realloc_target(
         string_view& dest, string_view s);
 
-    template<class OtherAlloc>
+    template<class OtherAlloc, class OtherProtocol>
     void
-    copy_all(basic_fields<OtherAlloc> const&);
+    copy_all(basic_fields<OtherAlloc, OtherProtocol> const&);
 
     void
     clear_all();

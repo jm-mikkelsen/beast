@@ -28,6 +28,10 @@ int_to_status(unsigned v)
     case status::continue_:
     case status::switching_protocols:
     case status::processing:
+    case status::ringing:
+    case status::call_is_being_forwarded:
+    case status::queued:
+    case status::session_progress:
         BOOST_FALLTHROUGH;
 
     // 2xx
@@ -52,6 +56,7 @@ int_to_status(unsigned v)
     case status::use_proxy:
     case status::temporary_redirect:
     case status::permanent_redirect:
+    case status::alternative_service:
         BOOST_FALLTHROUGH;
 
     // 4xx
@@ -73,6 +78,7 @@ int_to_status(unsigned v)
     case status::unsupported_media_type:
     case status::range_not_satisfiable:
     case status::expectation_failed:
+    case status::bad_extension:
     case status::misdirected_request:
     case status::unprocessable_entity:
     case status::locked:
@@ -83,6 +89,17 @@ int_to_status(unsigned v)
     case status::request_header_fields_too_large:
     case status::connection_closed_without_response:
     case status::unavailable_for_legal_reasons:
+    case status::temporarily_unavailable:
+    case status::call_or_transaction_does_not_exist:
+    case status::sip_loop_detected:
+    case status::too_many_hops:
+    case status::address_incomplete:
+    case status::ambiguous:
+    case status::busy_here:
+    case status::request_terminated:
+    case status::not_acceptable_here:
+    case status::request_pending:
+    case status::undecipherable:
     case status::client_closed_request:
         BOOST_FALLTHROUGH;
 
@@ -98,6 +115,7 @@ int_to_status(unsigned v)
     case status::loop_detected:
     case status::not_extended:
     case status::network_authentication_required:
+    case status::message_too_large:
     case status::network_connect_timeout_error:
         return static_cast<status>(v);
 
@@ -117,6 +135,10 @@ status_to_string(unsigned v)
     case status::continue_:                             return "Continue";
     case status::switching_protocols:                   return "Switching Protocols";
     case status::processing:                            return "Processing";
+    case status::ringing:                               return "Ringing";
+    case status::call_is_being_forwarded:               return "Call is Being Forwarded";
+    case status::queued:                                return "Queued";
+    case status::session_progress:                      return "Session Progress";
 
     // 2xx
     case status::ok:                                    return "OK";
@@ -139,6 +161,7 @@ status_to_string(unsigned v)
     case status::use_proxy:                             return "Use Proxy";
     case status::temporary_redirect:                    return "Temporary Redirect";
     case status::permanent_redirect:                    return "Permanent Redirect";
+    case status::alternative_service:                   return "Alternative Service";
 
     // 4xx
     case status::bad_request:                           return "Bad Request";
@@ -159,6 +182,7 @@ status_to_string(unsigned v)
     case status::unsupported_media_type:                return "Unsupported Media Type";
     case status::range_not_satisfiable:                 return "Range Not Satisfiable";
     case status::expectation_failed:                    return "Expectation Failed";
+    case status::bad_extension:                         return "Bad Extension";
     case status::misdirected_request:                   return "Misdirected Request";
     case status::unprocessable_entity:                  return "Unprocessable Entity";
     case status::locked:                                return "Locked";
@@ -169,7 +193,19 @@ status_to_string(unsigned v)
     case status::request_header_fields_too_large:       return "Request Header Fields Too Large";
     case status::connection_closed_without_response:    return "Connection Closed Without Response";
     case status::unavailable_for_legal_reasons:         return "Unavailable For Legal Reasons";
+    case status::temporarily_unavailable:               return "Temporarily Unavailable";
+    case status::call_or_transaction_does_not_exist:    return "Call/Transaction Does Not Exist";
+    case status::sip_loop_detected:                     return "Loop Detected";
+    case status::too_many_hops:                         return "Too Many Hops";
+    case status::address_incomplete:                    return "Address Incomplete";
+    case status::ambiguous:                             return "Ambiguous";
+    case status::busy_here:                             return "Busy Here";
+    case status::request_terminated:                    return "Request Terminated";
+    case status::not_acceptable_here:                   return "Not Acceptable Here";
+    case status::request_pending:                       return "Request Pending";
+    case status::undecipherable:                        return "Undecipherable";
     case status::client_closed_request:                 return "Client Closed Request";
+
     // 5xx
     case status::internal_server_error:                 return "Internal Server Error";
     case status::not_implemented:                       return "Not Implemented";
@@ -182,6 +218,7 @@ status_to_string(unsigned v)
     case status::loop_detected:                         return "Loop Detected";
     case status::not_extended:                          return "Not Extended";
     case status::network_authentication_required:       return "Network Authentication Required";
+    case status::message_too_large:                     return "Message Too Large";
     case status::network_connect_timeout_error:         return "Network Connect Timeout Error";
 
     default:

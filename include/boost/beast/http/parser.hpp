@@ -45,10 +45,12 @@ namespace http {
 template<
     bool isRequest,
     class Body,
-    class Allocator = std::allocator<char>>
+    class Allocator = std::allocator<char>,
+    class Protocol = protocol>
 class parser
     : public basic_parser<isRequest,
-        parser<isRequest, Body, Allocator>>
+        parser<isRequest, Body, Allocator, Protocol>,
+        Protocol>
 {
     static_assert(is_body<Body>::value,
         "Body requirements not met");
@@ -56,13 +58,14 @@ class parser
     static_assert(is_body_reader<Body>::value,
         "BodyReader requirements not met");
 
-    template<bool, class, class>
+    template<bool, class, class, class>
     friend class parser;
 
     using base_type = basic_parser<isRequest,
-        parser<isRequest, Body, Allocator>>;
+        parser<isRequest, Body, Allocator, Protocol>,
+        Protocol>;
 
-    message<isRequest, Body, basic_fields<Allocator>> m_;
+    message<isRequest, Body, basic_fields<Allocator, Protocol>> m_;
     typename Body::reader rd_;
     bool rd_inited_ = false;
 
@@ -79,7 +82,7 @@ class parser
 public:
     /// The type of message returned by the parser
     using value_type =
-        message<isRequest, Body, basic_fields<Allocator>>;
+        message<isRequest, Body, basic_fields<Allocator, Protocol>>;
 
     /// Destructor
     ~parser() = default;
@@ -297,7 +300,7 @@ public:
     }
 
 private:
-    friend class basic_parser<isRequest, parser>;
+    friend class basic_parser<isRequest, parser, Protocol>;
 
     parser(std::true_type);
     parser(std::false_type);

@@ -17,16 +17,16 @@ namespace boost {
 namespace beast {
 namespace http {
 
-template<bool isRequest, class Body, class Allocator>
-parser<isRequest, Body, Allocator>::
+template<bool isRequest, class Body, class Allocator, class Protocol>
+parser<isRequest, Body, Allocator, Protocol>::
 parser()
     : rd_(m_.base(), m_.body())
 {
 }
 
-template<bool isRequest, class Body, class Allocator>
+template<bool isRequest, class Body, class Allocator, class Protocol>
 template<class Arg1, class... ArgN, class>
-parser<isRequest, Body, Allocator>::
+parser<isRequest, Body, Allocator, Protocol>::
 parser(Arg1&& arg1, ArgN&&... argn)
     : m_(
         std::forward<Arg1>(arg1),
@@ -36,9 +36,9 @@ parser(Arg1&& arg1, ArgN&&... argn)
     m_.clear();
 }
 
-template<bool isRequest, class Body, class Allocator>
+template<bool isRequest, class Body, class Allocator, class Protocol>
 template<class OtherBody, class... Args, class>
-parser<isRequest, Body, Allocator>::
+parser<isRequest, Body, Allocator, Protocol>::
 parser(
     parser<isRequest, OtherBody, Allocator>&& other,
     Args&&... args)

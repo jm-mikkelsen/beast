@@ -382,14 +382,8 @@ prepare_payload(std::true_type)
             this->chunked(false);
         }
     }
-    else if(this->version() == 11)
-    {
-        this->chunked(true);
-    }
     else
-    {
-        this->chunked(false);
-    }
+        this->chunked(Fields::protocol::allow_chunked(this->version()));
 }
 
 template<bool isRequest, class Body, class Fields>
@@ -409,10 +403,8 @@ prepare_payload(std::false_type)
     }
     if(n)
         this->content_length(n);
-    else if(this->version() == 11)
-        this->chunked(true);
     else
-        this->chunked(false);
+        this->chunked(Fields::protocol::allow_chunked(this->version()));
 }
 
 //------------------------------------------------------------------------------

@@ -26,7 +26,7 @@ namespace detail {
 struct field_table
 {
     using array_type =
-        std::array<string_view, 353>;
+        std::array<string_view, 357>;
 
     struct hash
     {
@@ -140,6 +140,7 @@ struct field_table
             "C-PEP-Info",
             "Cache-Control",
             "CalDAV-Timezones",
+            "Call-ID",
             "Cancel-Key",
             "Cancel-Lock",
             "Cc",
@@ -147,6 +148,7 @@ struct field_table
             "Comments",
             "Compliance",
             "Connection",
+            "Contact",
             "Content-Alternative",
             "Content-Base",
             "Content-Description",
@@ -173,6 +175,7 @@ struct field_table
             "Cookie",
             "Cookie2",
             "Cost",
+            "CSeq",
             "DASL",
             "Date",
             "Date-Received",
@@ -389,6 +392,7 @@ struct field_table
             "Subst",
             "Summary",
             "Supersedes",
+            "Supported",
             "Surrogate-Capability",
             "Surrogate-Control",
             "TCN",
@@ -550,7 +554,7 @@ to_string(field f)
 
 inline
 field
-string_to_field(string_view s)
+default_string_to_field(string_view s)
 {
     return detail::get_field_table().string_to_field(s);
 }
